@@ -59,8 +59,8 @@ export default function Admin() {
   ];
 
   return (
-    <main className="min-h-screen bg-stone-50">
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-30">
+    <main className="min-h-screen bg-stone-50 pt-16">
+      <header className="bg-white border-b border-stone-200 sticky top-16 z-30">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-xl">🏠</span>
