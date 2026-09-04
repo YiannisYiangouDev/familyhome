@@ -1,6 +1,5 @@
-
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 
 type Price = {
   nights: number;
@@ -11,22 +10,53 @@ type Price = {
   depositPct: number;
 };
 
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW = ["Mo","Tu","We","Th","Fr","Sa","Su"];
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function addDays(s: string, n: number) {
+  const d = new Date(s + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function daysBetween(a: string, b: string) {
+  return Math.round((new Date(b + "T12:00:00").getTime() - new Date(a + "T12:00:00").getTime()) / 86400000);
+}
+function fmtDate(s: string) {
+  return new Date(s + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export default function BookPage() {
   const [ci, setCi] = useState("");
   const [co, setCo] = useState("");
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [price, setPrice] = useState<Price | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ guestName: "", email: "", phone: "", adults: 2, children: 0, notes: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
 
+  // Fetch blocked dates
+  useEffect(() => {
+    fetch("/api/blocked").then(r => r.json()).then(d => {
+      if (d.dates) setBlocked(new Set(d.dates));
+    }).catch(() => {});
+  }, []);
+
+  // Fetch price
   useEffect(() => {
     if (!ci || !co) return;
     const ctrl = new AbortController();
     setLoading(true);
     fetch(`/api/availability?ci=${ci}&co=${co}`, { signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((d) => {
+      .then(r => r.json())
+      .then(d => {
         setLoading(false);
         if (d.error) { setErr(d.error); setPrice(null); }
         else if (d.available === false) { setErr("Selected dates unavailable"); setPrice(null); }
@@ -35,6 +65,41 @@ export default function BookPage() {
       .catch(() => setLoading(false));
     return () => ctrl.abort();
   }, [ci, co]);
+
+  const onDayClick = useCallback((dateStr: string) => {
+    if (blocked.has(dateStr) || dateStr < todayStr()) return;
+    if (!ci || (ci && co)) {
+      setCi(dateStr);
+      setCo("");
+      setPrice(null);
+      setErr(null);
+    } else if (dateStr > ci) {
+      const n = daysBetween(ci, dateStr);
+      let hasBlock = false;
+      for (let i = 0; i < n; i++) { if (blocked.has(addDays(ci, i))) { hasBlock = true; break; } }
+      if (hasBlock) { setErr("Unavailable dates in your selection"); return; }
+      if (n < 3) { setErr("Minimum 3-night stay required"); return; }
+      setCo(dateStr);
+    } else {
+      setCi(dateStr);
+      setCo("");
+    }
+  }, [ci, co, blocked]);
+
+  const calGrid = useMemo(() => {
+    const year = calMonth.getFullYear();
+    const month = calMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = (firstDay.getDay() + 6) % 7;
+    const cells: ({ date: string; day: number } | null)[] = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({ date: ds, day: d });
+    }
+    return cells;
+  }, [calMonth]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,96 +116,226 @@ export default function BookPage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-6 py-12">
-      <a href="/" className="text-amber-700 hover:underline text-sm">← Home</a>
-      <h1 className="text-3xl font-bold mt-4 mb-8">Check availability</h1>
+    <main className="min-h-screen bg-stone-50 pt-16">
+      {/* Header */}
+      <div className="bg-stone-900 text-white py-14 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <img src="/photos/photo-01.jpg" alt="" className="w-full h-full object-cover" />
+        </div>
+        <div className="relative max-w-6xl mx-auto px-6">
+          <a href="/" className="text-amber-400 hover:text-amber-300 text-sm transition">← Back to home</a>
+          <h1 className="text-4xl font-bold mt-3">Book Your Stay</h1>
+          <p className="text-stone-300 mt-2 text-lg font-light">Select dates and pay a 30% deposit to confirm instantly.</p>
+        </div>
+      </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Check-in</label>
-            <input type="date" value={ci} onChange={(e) => setCi(e.target.value)}
-              className="w-full border border-stone-300 rounded-lg px-3 py-2" />
+      <div className="max-w-6xl mx-auto px-6 py-10 grid lg:grid-cols-[1fr_380px] gap-8">
+        {/* Left column */}
+        <div className="space-y-6">
+          {/* Calendar */}
+          <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <button onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}
+                className="p-2.5 hover:bg-stone-100 rounded-xl transition text-stone-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <h2 className="text-lg font-bold text-stone-800">{MONTHS[calMonth.getMonth()]} {calMonth.getFullYear()}</h2>
+              <button onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))}
+                className="p-2.5 hover:bg-stone-100 rounded-xl transition text-stone-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {DOW.map(d => <div key={d} className="text-center text-xs font-semibold text-stone-400 py-2">{d}</div>)}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {calGrid.map((cell, i) => {
+                if (!cell) return <div key={i} />;
+                const isPast = cell.date < todayStr();
+                const isBlocked = blocked.has(cell.date);
+                const isToday = cell.date === todayStr();
+                const isStart = cell.date === ci;
+                const isEnd = cell.date === co;
+                const inRange = ci && co && cell.date > ci && cell.date < co;
+                const disabled = isPast || isBlocked;
+                return (
+                  <button key={i} disabled={disabled} onClick={() => onDayClick(cell.date)}
+                    className={`cal-day ${isStart || isEnd ? "selected" : ""} ${inRange ? "in-range" : ""} ${disabled ? "disabled" : ""} ${isToday ? "today" : ""}`}
+                  >
+                    {cell.day}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-4 mt-6 text-xs text-stone-500">
+              <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded bg-amber-500 inline-block"></span> Selected</span>
+              <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded bg-yellow-100 inline-block"></span> In range</span>
+              <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded border-2 border-amber-500 inline-block"></span> Today</span>
+              <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded bg-stone-200 opacity-30 inline-block"></span> Unavailable</span>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Check-out</label>
-            <input type="date" value={co} onChange={(e) => setCo(e.target.value)}
-              className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-          </div>
+
+          {/* Dates summary */}
+          {(ci || co) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-wrap gap-6">
+              <div>
+                <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Check-in</p>
+                <p className="font-semibold text-stone-800">{ci ? fmtDate(ci) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Check-out</p>
+                <p className="font-semibold text-stone-800">{co ? fmtDate(co) : "—"}</p>
+              </div>
+              {ci && co && (
+                <div className="ml-auto">
+                  <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Duration</p>
+                  <p className="font-semibold text-stone-800">{daysBetween(ci, co)} nights</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex items-center justify-center py-4 text-stone-500 gap-2">
+              <span className="inline-block animate-spin h-4 w-4 border-2 border-amber-500 border-t-transparent rounded-full"></span>
+              Checking availability…
+            </div>
+          )}
+          {err && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{err}</div>}
+
+          {/* Booking form */}
+          {price && (
+            <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-5">
+              <h3 className="text-xl font-bold text-stone-800">Guest Details</h3>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-stone-700">Full Name *</label>
+                <input required value={form.guestName} onChange={e => setForm({ ...form, guestName: e.target.value })}
+                  placeholder="Your full name"
+                  className="w-full border border-stone-300 rounded-lg px-4 py-3 text-sm" />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 text-stone-700">Email *</label>
+                  <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+                    placeholder="you@example.com"
+                    className="w-full border border-stone-300 rounded-lg px-4 py-3 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 text-stone-700">Phone</label>
+                  <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
+                    placeholder="+357 …"
+                    className="w-full border border-stone-300 rounded-lg px-4 py-3 text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 text-stone-700">Adults</label>
+                  <div className="flex items-center gap-3 border border-stone-300 rounded-lg px-3 py-2">
+                    <button type="button" onClick={() => setForm(f => ({ ...f, adults: Math.max(1, f.adults - 1) }))}
+                      className="w-8 h-8 rounded-md hover:bg-stone-100 transition font-bold text-stone-600">−</button>
+                    <span className="text-base font-semibold w-6 text-center">{form.adults}</span>
+                    <button type="button" onClick={() => setForm(f => ({ ...f, adults: Math.min(7, f.adults + 1) }))}
+                      className="w-8 h-8 rounded-md hover:bg-stone-100 transition font-bold text-stone-600">+</button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 text-stone-700">Children</label>
+                  <div className="flex items-center gap-3 border border-stone-300 rounded-lg px-3 py-2">
+                    <button type="button" onClick={() => setForm(f => ({ ...f, children: Math.max(0, f.children - 1) }))}
+                      className="w-8 h-8 rounded-md hover:bg-stone-100 transition font-bold text-stone-600">−</button>
+                    <span className="text-base font-semibold w-6 text-center">{form.children}</span>
+                    <button type="button" onClick={() => setForm(f => ({ ...f, children: Math.min(6, f.children + 1) }))}
+                      className="w-8 h-8 rounded-md hover:bg-stone-100 transition font-bold text-stone-600">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-stone-700">Special Requests</label>
+                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3}
+                  placeholder="Arrival time, baby cot, anything we should know…"
+                  className="w-full border border-stone-300 rounded-lg px-4 py-3 text-sm resize-none" />
+              </div>
+
+              <button type="submit" disabled={submitting}
+                className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-4 rounded-lg text-lg transition-all duration-300 hover:scale-[1.02] shadow-lg shadow-amber-500/20">
+                {submitting ? "Redirecting to Stripe…" : `Pay Deposit €${(price.depositCents / 100).toFixed(2)}`}
+              </button>
+              <div className="flex items-center justify-center gap-2 text-xs text-stone-500">
+                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                Secured by Stripe · 30% deposit · Balance at check-in
+              </div>
+            </form>
+          )}
         </div>
 
-        {loading && <p className="text-stone-500">Checking…</p>}
-        {err && <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{err}</p>}
-        {price && (
-          <div className="bg-stone-50 rounded-lg p-4 mb-6 border border-stone-200">
-            <div className="flex justify-between text-sm mb-1">
-              <span>{price.nights} nights</span>
-              <span>€{(price.totalCents - price.depositCents - price.cleaningFee * 100) / 100}</span>
+        {/* Right: Sticky sidebar */}
+        <div>
+          <div className="lg:sticky lg:top-20 space-y-4">
+            <div className="rounded-2xl overflow-hidden shadow-lg img-zoom">
+              <img src="/photos/photo-01.jpg" alt="Family Home" className="w-full h-48 object-cover" />
             </div>
-            {price.cleaningFee > 0 && (
-              <div className="flex justify-between text-sm mb-1">
-                <span>Cleaning fee</span><span>€{price.cleaningFee}</span>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5">
+              <h3 className="font-bold text-stone-800 mb-1">Family Home Protaras</h3>
+              <p className="text-sm text-stone-500 mb-4">⭐ 9.9 · 4 bed · 2 bath · 7 guests</p>
+              <div className="border-t border-stone-100 pt-4 space-y-2.5 text-sm">
+                {[
+                  ["Base rate", "€200/night"],
+                  ["Minimum stay", "3 nights"],
+                  ["Deposit", "30% at booking"],
+                  ["Check-in", "3 PM – 7 PM"],
+                  ["Check-out", "11:30 AM"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between"><span className="text-stone-500">{k}</span><span className="font-medium text-stone-800">{v}</span></div>
+                ))}
+              </div>
+            </div>
+
+            {price && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 price-badge">
+                <h3 className="font-bold text-stone-800 mb-4 text-sm">Price Breakdown</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-stone-600">€{price.breakdown[0]?.rate ?? 200}/night × {price.nights}</span>
+                    <span className="font-medium">€{((price.totalCents - price.cleaningFee * 100) / 100).toFixed(2)}</span>
+                  </div>
+                  {price.cleaningFee > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-stone-600">Cleaning fee</span>
+                      <span className="font-medium">€{price.cleaningFee}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-amber-200 pt-2 flex justify-between font-bold text-lg">
+                    <span>Total</span><span>€{(price.totalCents / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 mt-3 border border-amber-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-amber-700 text-sm">Deposit due now</p>
+                        <p className="text-xs text-stone-500 mt-0.5">Balance at check-in</p>
+                      </div>
+                      <span className="text-2xl font-bold text-amber-700">€{(price.depositCents / 100).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-lg border-t border-stone-200 pt-2 mt-2">
-              <span>Total</span><span>€{(price.totalCents / 100).toFixed(2)}</span>
-            </div>
-            <p className="text-sm text-stone-600 mt-2">
-              Deposit now: <strong>€{(price.depositCents / 100).toFixed(2)}</strong> ({price.depositPct}%) — balance due at check-in.
-            </p>
-          </div>
-        )}
 
-        {price && (
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Guest name *</label>
-              <input required value={form.guestName}
-                onChange={(e) => setForm({ ...form, guestName: e.target.value })}
-                className="w-full border border-stone-300 rounded-lg px-3 py-2" />
+            <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-2.5 text-xs text-stone-600">
+              <p className="flex items-center gap-2"><span className="text-green-600">✓</span> Free cancellation up to 7 days before</p>
+              <p className="flex items-center gap-2"><span className="text-green-600">✓</span> Instant confirmation</p>
+              <p className="flex items-center gap-2"><span className="text-green-600">✓</span> Secure payment via Stripe</p>
+              <p className="flex items-center gap-2"><span className="text-green-600">✓</span> Best rate — no commission</p>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold mb-1">Email *</label>
-                <input type="email" required value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">Phone</label>
-                <input value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold mb-1">Adults</label>
-                <input type="number" min={1} max={7} value={form.adults}
-                  onChange={(e) => setForm({ ...form, adults: Number(e.target.value) })}
-                  className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1">Children</label>
-                <input type="number" min={0} max={6} value={form.children}
-                  onChange={(e) => setForm({ ...form, children: Number(e.target.value) })}
-                  className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Notes</label>
-              <textarea value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows={3}
-                className="w-full border border-stone-300 rounded-lg px-3 py-2" />
-            </div>
-            <button type="submit" disabled={submitting}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-semibold py-3 rounded-lg transition">
-              {submitting ? "Starting checkout…" : `Pay deposit €${(price.depositCents / 100).toFixed(2)}`}
-            </button>
-            <p className="text-xs text-stone-500 text-center">Powered by Stripe. You&apos;ll be redirected to secure payment.</p>
-          </form>
-        )}
+          </div>
+        </div>
       </div>
     </main>
   );
