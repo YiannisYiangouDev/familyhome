@@ -247,8 +247,6 @@ export default function Home() {
               { name: "Lynn", country: "🇬🇧 UK", text: "Great property very close to the beach, but far enough so we could have some peace and quiet. Easy walk to main restaurants and shops. Very clean and comfortable." },
               { name: "Marta", country: "🇵🇱 Poland", text: "The house is large, comfortable and clean. It was wonderful to eat and relax in the well-kept garden under the sun umbrellas." },
               { name: "Dario", country: "🇷🇸 Serbia", text: "Great accommodation, and an even better host who was there for everything we needed. We can't wait to come again." },
-              { name: "Elena", country: "🇷🇺 Russia", text: "We had a wonderful stay! The villa is exactly as shown in the pictures. Everything was spotless and the kids loved it." },
-              { name: "Thomas", country: "🇩🇪 Germany", text: "Perfect family holiday destination. Children loved the garden and the beach is really close. Will definitely book again next year!" },
             ].map((r, i) => (
               <Reveal key={i} delay={`reveal-delay-${(i % 3) + 1}`}>
                 <div className="bg-stone-50 rounded-2xl p-6 border border-stone-100 hover-lift">
@@ -340,6 +338,36 @@ export default function Home() {
               <AccordionItem key={i} question={item.q} answer={item.a} />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Contact ── */}
+      <section id="contact" className="py-24 bg-stone-50">
+        <div className="max-w-4xl mx-auto px-6">
+          <Reveal className="text-center mb-12">
+            <span className="badge bg-amber-100 text-amber-700 mb-4">Get In Touch</span>
+            <h2 className="text-3xl font-bold text-stone-800">Questions? We&apos;re Happy to Help</h2>
+            <p className="text-stone-600 mt-3 max-w-xl mx-auto">Reach out for availability on dates that don&apos;t work with the calendar, longer stays, group bookings, or anything else about your stay.</p>
+          </Reveal>
+          <Reveal delay="reveal-delay-1">
+            <div className="grid sm:grid-cols-3 gap-4">
+              <a href="mailto:yiannis@yiangouweb.com" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
+                <div className="text-3xl mb-3">✉️</div>
+                <h3 className="font-semibold text-stone-800">Email</h3>
+                <p className="text-sm text-stone-500 mt-1 break-all">yiannis@yiangouweb.com</p>
+              </a>
+              <a href="https://wa.me/" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
+                <div className="text-3xl mb-3">💬</div>
+                <h3 className="font-semibold text-stone-800">WhatsApp</h3>
+                <p className="text-sm text-stone-500 mt-1">Fastest reply — usually within hours</p>
+              </a>
+              <a href="https://www.booking.com/hotel/cy/family-home.html" target="_blank" rel="noopener noreferrer" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
+                <div className="text-3xl mb-3">🏨</div>
+                <h3 className="font-semibold text-stone-800">Booking.com</h3>
+                <p className="text-sm text-stone-500 mt-1">Prefer an OTA? See our listing</p>
+              </a>
+            </div>
+          </Reveal>
         </div>
       </section>
 
