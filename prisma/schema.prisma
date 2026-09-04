@@ -1,0 +1,53 @@
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Season {
+  id        Int      @id @default(autoincrement())
+  year      Int
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  rate      Int      // EUR per night
+  label     String   @default("")
+  bookings  Booking[]
+  @@unique([year, startDate, endDate])
+}
+
+model Booking {
+  id              Int      @id @default(autoincrement())
+  checkIn         DateTime @db.Date
+  checkOut        DateTime @db.Date
+  nights          Int
+  guestName       String
+  email           String
+  phone           String   @default("")
+  adults          Int      @default(2)
+  children        Int      @default(0)
+  totalCents      Int
+  depositCents    Int
+  status          String   @default("pending") // pending | confirmed | cancelled
+  stripeSessionId String?  @unique
+  stripePaymentId String?
+  notes           String   @default("")
+  seasonId        Int?
+  season          Season?  @relation(fields: [seasonId], references: [id])
+  createdAt       DateTime @default(now())
+  @@index([checkIn, checkOut])
+}
+
+model BlockedDate {
+  id     Int      @id @default(autoincrement())
+  date   DateTime @unique @db.Date
+  reason String   @default("blocked")
+}
+
+model Setting {
+  key   String @id
+  value String
+}
