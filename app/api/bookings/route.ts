@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { priceStay, parseDate } from "@/lib/pricing";
 import Stripe from "stripe";
 import { isAdmin, login, logout } from "@/lib/auth";
+import { sendBookingConfirmation } from "@/lib/email";
 
 const stripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-08-26.dahlia" });
 
@@ -61,6 +62,17 @@ export async function POST(req: NextRequest) {
       where: { id: booking.id },
       data: { stripeSessionId: session.id },
     });
+    // Send confirmation email after Stripe session created
+    await sendBookingConfirmation({
+      guestName,
+      email,
+      checkIn: String(checkIn),
+      checkOut: String(checkOut),
+      nights: priced.nights,
+      totalCents: booking.totalCents ?? 0,
+      depositCents: booking.depositCents ?? 0,
+    });
+
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     await prisma.booking.delete({ where: { id: booking.id } });

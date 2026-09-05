@@ -351,10 +351,10 @@ export default function Home() {
           </Reveal>
           <Reveal delay="reveal-delay-1">
             <div className="grid sm:grid-cols-3 gap-4">
-              <a href="mailto:yiannis@yiangouweb.com" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
+              <a href="mailto:familyhome@yiangouweb.com" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
                 <div className="text-3xl mb-3">✉️</div>
                 <h3 className="font-semibold text-stone-800">Email</h3>
-                <p className="text-sm text-stone-500 mt-1 break-all">yiannis@yiangouweb.com</p>
+                <p className="text-sm text-stone-500 mt-1 break-all">familyhome@yiangouweb.com</p>
               </a>
               <a href="https://wa.me/" className="bg-white rounded-2xl p-6 text-center hover-lift border border-stone-200">
                 <div className="text-3xl mb-3">💬</div>
