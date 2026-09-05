@@ -10,6 +10,15 @@ type Price = {
   depositPct: number;
 };
 
+type Rates = {
+  minNights: number;
+  depositPct: number;
+  cleaningFee: number;
+  baseRate: number;
+  seasons: { startDate: string; endDate: string; rate: number; label: string }[];
+  blockedDates: string[];
+};
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
@@ -40,14 +49,22 @@ export default function BookPage() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ guestName: "", email: "", phone: "", adults: 2, children: 0, notes: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  const [rates, setRates] = useState<Rates | null>(null);
 
-  // Fetch blocked dates
+  // Fetch public rate card (seasons + blocked dates + policy) — /api/blocked
+  // returns objects, /api/rates returns flat date strings the calendar needs.
   useEffect(() => {
-    fetch("/api/blocked").then(r => r.json()).then(d => {
-      if (d.dates) setBlocked(new Set(d.dates));
-    }).catch(() => {});
+    fetch("/api/rates").then(r => r.json()).then(d => setRates(d)).catch(() => {});
   }, []);
+
+  const blocked = useMemo(() => new Set(rates?.blockedDates ?? []), [rates]);
+  const minNights = rates?.minNights ?? 3;
+
+  /** Per-night rate for a date, or null if not inside any published season */
+  const rateFor = useCallback((dateStr: string): number | null => {
+    const s = rates?.seasons.find(x => dateStr >= x.startDate && dateStr <= x.endDate);
+    return s ? s.rate : null;
+  }, [rates]);
 
   // Fetch price
   useEffect(() => {
@@ -78,13 +95,13 @@ export default function BookPage() {
       let hasBlock = false;
       for (let i = 0; i < n; i++) { if (blocked.has(addDays(ci, i))) { hasBlock = true; break; } }
       if (hasBlock) { setErr("Unavailable dates in your selection"); return; }
-      if (n < 3) { setErr("Minimum 3-night stay required"); return; }
+      if (n < minNights) { setErr("Minimum " + minNights + "-night stay required"); return; }
       setCo(dateStr);
     } else {
       setCi(dateStr);
       setCo("");
     }
-  }, [ci, co, blocked]);
+  }, [ci, co, blocked, minNights]);
 
   const calGrid = useMemo(() => {
     const year = calMonth.getFullYear();
@@ -160,11 +177,16 @@ export default function BookPage() {
                 const isEnd = cell.date === co;
                 const inRange = ci && co && cell.date > ci && cell.date < co;
                 const disabled = isPast || isBlocked;
+                const nightRate = rateFor(cell.date);
                 return (
                   <button key={i} disabled={disabled} onClick={() => onDayClick(cell.date)}
+                    title={nightRate != null ? "€" + nightRate + " / night" : undefined}
                     className={`cal-day ${isStart || isEnd ? "selected" : ""} ${inRange ? "in-range" : ""} ${disabled ? "disabled" : ""} ${isToday ? "today" : ""}`}
                   >
-                    {cell.day}
+                    <span className="day-num">{cell.day}</span>
+                    {nightRate != null && !disabled && (
+                      <span className="day-rate">€{nightRate}</span>
+                    )}
                   </button>
                 );
               })}
@@ -286,15 +308,20 @@ export default function BookPage() {
               <h3 className="font-bold text-stone-800 mb-1">Family Home Protaras</h3>
               <p className="text-sm text-stone-500 mb-4">⭐ 9.9 · 4 bed · 2 bath · 7 guests</p>
               <div className="border-t border-stone-100 pt-4 space-y-2.5 text-sm">
-                {[
-                  ["Base rate", "€200/night"],
-                  ["Minimum stay", "3 nights"],
-                  ["Deposit", "30% at booking"],
-                  ["Check-in", "3 PM – 7 PM"],
-                  ["Check-out", "11:30 AM"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between"><span className="text-stone-500">{k}</span><span className="font-medium text-stone-800">{v}</span></div>
-                ))}
+                {rates && rates.seasons.length > 0 ? (
+                  rates.seasons.slice(0, 4).map(s => (
+                    <div key={s.startDate} className="flex justify-between">
+                      <span className="text-stone-500">{s.label || "Standard"}</span>
+                      <span className="font-medium text-stone-800">€{s.rate}/night</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between"><span className="text-stone-500">Base rate</span><span className="font-medium text-stone-800">from €{rates ? rates.baseRate : 200}/night</span></div>
+                )}
+                <div className="flex justify-between"><span className="text-stone-500">Minimum stay</span><span className="font-medium text-stone-800">{minNights} nights</span></div>
+                <div className="flex justify-between"><span className="text-stone-500">Deposit</span><span className="font-medium text-stone-800">{rates ? rates.depositPct : 30}% at booking</span></div>
+                <div className="flex justify-between"><span className="text-stone-500">Check-in</span><span className="font-medium text-stone-800">3 PM – 7 PM</span></div>
+                <div className="flex justify-between"><span className="text-stone-500">Check-out</span><span className="font-medium text-stone-800">11:30 AM</span></div>
               </div>
             </div>
 

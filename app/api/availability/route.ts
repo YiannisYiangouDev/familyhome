@@ -22,10 +22,8 @@ export async function GET(req: NextRequest) {
   }
 
   const priced = await priceStay(checkIn, checkOut);
-  return NextResponse.json({
-    available: !priced || !("error" in priced) || false,
-    ...(priced ?? {}),
-    checkIn,
-    checkOut,
-  });
+  if (!priced || "error" in priced) {
+    return NextResponse.json({ available: false, error: priced?.error ?? "Invalid dates" }, { status: 409 });
+  }
+  return NextResponse.json({ available: true, ...priced, checkIn, checkOut });
 }
