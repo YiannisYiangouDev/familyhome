@@ -8,3 +8,4 @@ generated/
 *.log
 .DS_Store
 .stripe/
+postgres-data/
