@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export interface BookingEmailData {
   guestName: string;
   email: string;
@@ -12,11 +10,23 @@ export interface BookingEmailData {
   depositCents: number;
 }
 
+// Guarded singleton: never throw on missing key.
+export function getResend() {
+  if (!process.env.RESEND_API_KEY) return null;
+  return new Resend(process.env.RESEND_API_KEY);
+}
+
 export async function sendBookingConfirmation(data: BookingEmailData) {
   const { guestName, email, checkIn, checkOut, nights, totalCents, depositCents } = data;
 
+  const client = getResend();
+  if (!client) {
+    console.warn("[email] RESEND_API_KEY not set; skipping confirmation email.");
+    return { ok: false, error: "not configured" };
+  }
+
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: "Family Home Protaras <noreply@yiangouweb.com>",
       to: [email],
       subject: "Booking Confirmation — Family Home Protaras",

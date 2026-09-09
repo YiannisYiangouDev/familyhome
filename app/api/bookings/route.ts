@@ -5,6 +5,7 @@ import { priceStay, parseDate } from "@/lib/pricing";
 import Stripe from "stripe";
 import { isAdmin, login, logout } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/email";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const stripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-08-26.dahlia" });
 
@@ -13,6 +14,10 @@ export const dynamic = "force-dynamic";
 
 // Public POST: create booking -> Stripe Checkout
 export async function POST(req: NextRequest) {
+  // Rate limit per client IP (first statement so abuse is blocked before any work)
+  if (!rateLimit(`booking:${clientIp(req)}`, 10, 60_000)) {
+    return NextResponse.json({ error: "too many requests" }, { status: 429 });
+  }
   const body = await req.json();
   const { checkIn, checkOut, guestName, email, phone, adults, children, notes } = body;
   if (!checkIn || !checkOut || !guestName || !email) {
@@ -62,8 +67,8 @@ export async function POST(req: NextRequest) {
       where: { id: booking.id },
       data: { stripeSessionId: session.id },
     });
-    // Send confirmation email after Stripe session created
-    await sendBookingConfirmation({
+    // Fire confirmation email asynchronously — never block the Stripe redirect.
+    const emailData = {
       guestName,
       email,
       checkIn: String(checkIn),
@@ -71,7 +76,9 @@ export async function POST(req: NextRequest) {
       nights: priced.nights,
       totalCents: booking.totalCents ?? 0,
       depositCents: booking.depositCents ?? 0,
-    });
+    };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    sendBookingConfirmation(emailData).catch(() => {});
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
