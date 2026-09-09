@@ -9,3 +9,4 @@ generated/
 .DS_Store
 .stripe/
 postgres-data/
+tsconfig.tsbuildinfo
