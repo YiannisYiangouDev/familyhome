@@ -135,8 +135,8 @@ export default async function AvailabilityPage() {
         </div>
 
         {/* Months */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {months.map(({ y, m }) => {
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {months.map(({ y, m }, i) => {
             const firstOffset = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
             const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
             const cells: ({ date: string; day: number } | null)[] = [];
@@ -144,7 +144,7 @@ export default async function AvailabilityPage() {
             for (let d = 1; d <= daysInMonth; d++) cells.push({ date: dateStr(y, m, d), day: d });
 
             return (
-              <div key={`${y}-${m}`} className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5">
+              <div key={`${y}-${m}`} style={{ animationDelay: `${i * 40}ms` }} className="avail-card bg-white rounded-2xl shadow-sm border border-stone-200 p-3 sm:p-5">
                 <h2 className="text-base font-bold text-stone-800 mb-4">
                   {MONTH_NAMES[m]} {y}
                 </h2>
@@ -162,15 +162,12 @@ export default async function AvailabilityPage() {
                     const isToday = cell.date === today;
                     const rate = rateFor(seasonList, cell.date);
                     const unavailable = isPast || isBlocked || isBooked || rate === null;
-                    const title = isBooked
-                      ? "Booked"
-                      : isBlocked
-                        ? "Unavailable"
-                        : isPast
-                          ? "Past date"
-                          : rate === null
-                            ? "Not bookable online yet"
-                            : `Available — €${rate} / night`;
+                    let title: string;
+                    if (isBooked) title = "Booked";
+                    else if (isBlocked) title = "Unavailable";
+                    else if (isPast) title = "Past date";
+                    else if (rate === null) title = "Not bookable online yet";
+                    else title = `Available — €${rate} / night`;
                     return (
                       <div
                         key={i}

@@ -150,7 +150,7 @@ export default function BookPage() {
         {/* Left column */}
         <div className="space-y-6">
           {/* Calendar */}
-          <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-3 sm:p-6">
             <div className="flex items-center justify-between mb-6">
               <button onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}
                 className="p-2.5 hover:bg-stone-100 rounded-xl transition text-stone-600">
@@ -202,7 +202,7 @@ export default function BookPage() {
 
           {/* Dates summary */}
           {(ci || co) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-wrap gap-6">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-wrap gap-6 fade-up">
               <div>
                 <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Check-in</p>
                 <p className="font-semibold text-stone-800">{ci ? fmtDate(ci) : "—"}</p>
@@ -230,7 +230,7 @@ export default function BookPage() {
 
           {/* Booking form */}
           {price && (
-            <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-5">
+            <form onSubmit={submit} className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-5 fade-up">
               <h3 className="text-xl font-bold text-stone-800">Guest Details</h3>
 
               <div>

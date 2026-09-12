@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Nav from "@/components/Nav";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const SITE_URL = "https://familyhomeprotaras.yiangouweb.com";
@@ -24,6 +25,15 @@ export const metadata: Metadata = {
     description: "4-bed villa rated 9.9/10 — book direct and skip the commission.",
     images: ["/photos/photo-01.jpg"],
   },
+  icons: {
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f59e0b",
+  width: "device-width",
+  initialScale: 1,
 };
 
 const jsonLd = {
@@ -64,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-stone-50 text-stone-900 antialiased">
         <Nav />
         {children}
+        <ServiceWorkerRegister />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </body>
     </html>

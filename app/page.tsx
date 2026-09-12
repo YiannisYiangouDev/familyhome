@@ -93,9 +93,9 @@ export default function Home() {
   return (
     <main>
       {/* ── Hero ── */}
-      <section className="relative h-screen min-h-[650px] overflow-hidden">
+      <section className="relative h-svh min-h-[560px] overflow-hidden">
         <div className="absolute inset-0">
-          <img src="/photos/photo-01.jpg" alt="" className="w-full h-full object-cover" />
+          <img src="/photos/photo-01.jpg" alt="" className="w-full h-full object-cover kenburns" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60" />
         </div>
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-white text-center px-6 hero-stagger">

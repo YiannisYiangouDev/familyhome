@@ -250,7 +250,8 @@ function Settings() {
     setTimeout(() => setSaved(false), 2000);
   }
   return (
-    <form onSubmit={save} className="bg-white rounded-2xl border border-stone-200 p-6 max-w-lg">
+    <div className="space-y-6 max-w-lg">
+      <form onSubmit={save} className="bg-white rounded-2xl border border-stone-200 p-6">
       <h2 className="font-bold text-stone-800 mb-6">Site Settings</h2>
       <div className="space-y-4">
         <div>
@@ -277,6 +278,107 @@ function Settings() {
       <button type="submit" className="mt-6 bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-3 rounded-lg transition">
         {saved ? "✓ Saved" : "Save Settings"}
       </button>
-    </form>
+      </form>
+      <Notifications />
+    </div>
+  );
+}
+
+function urlBase64ToUint8Array(base64: string) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.codePointAt(0) ?? 0));
+}
+
+function Notifications() {
+  const [status, setStatus] = useState<"loading" | "unsupported" | "denied" | "enabled" | "disabled" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) { setStatus("unsupported"); return; }
+    navigator.serviceWorker.ready
+      .then(async (reg) => {
+        const sub = await reg.pushManager.getSubscription();
+        let st: "denied" | "enabled" | "disabled" = "disabled";
+        if (sub) st = "enabled";
+        else if (Notification.permission === "denied") st = "denied";
+        setStatus(st);
+      })
+      .catch(() => setStatus("disabled"));
+  }, []);
+
+  async function enable() {
+    setBusy(true); setMsg("");
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { setStatus("denied"); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const { publicKey } = await (await fetch("/api/push/subscribe")).json();
+      if (!publicKey) { setMsg("Push is not configured on the server yet."); setStatus("error"); return; }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+      await fetch("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+      setStatus("enabled");
+    } catch { setStatus("error"); } finally { setBusy(false); }
+  }
+
+  async function disable() {
+    setBusy(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await sub.unsubscribe();
+        await fetch(`/api/push/unsubscribe?endpoint=${encodeURIComponent(sub.endpoint)}`, { method: "DELETE" });
+      }
+      setStatus("disabled");
+    } catch { setStatus("error"); } finally { setBusy(false); }
+  }
+
+  async function test() {
+    setBusy(true); setMsg("");
+    await fetch("/api/push/test", { method: "POST" });
+    setMsg("Test notification sent — check this device.");
+    setBusy(false);
+  }
+
+  const badge: Record<string, string> = {
+    loading: "bg-stone-100 text-stone-600",
+    unsupported: "bg-stone-100 text-stone-600",
+    denied: "bg-red-100 text-red-700",
+    enabled: "bg-green-100 text-green-700",
+    disabled: "bg-amber-100 text-amber-700",
+    error: "bg-red-100 text-red-700",
+  };
+  const label: Record<string, string> = {
+    loading: "Checking…",
+    unsupported: "Not supported on this browser",
+    denied: "Blocked in browser settings",
+    enabled: "Notifications on",
+    disabled: "Notifications off",
+    error: "Something went wrong",
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-stone-200 p-6">
+      <h2 className="font-bold text-stone-800 mb-1">Booking Notifications</h2>
+      <p className="text-sm text-stone-500 mb-4">Get a push notification on this device when someone books or pays.</p>
+      <div className="flex items-center gap-3 mb-4">
+        <span className={`badge ${badge[status]}`}>{label[status]}</span>
+        {msg && <span className="text-xs text-stone-500">{msg}</span>}
+      </div>
+      <div className="flex gap-3">
+        {status !== "enabled" && status !== "unsupported" && (
+          <button onClick={enable} disabled={busy} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold px-5 py-2.5 rounded-lg text-sm transition">Enable</button>
+        )}
+        {status === "enabled" && (
+          <button onClick={test} disabled={busy} className="bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition">Send test</button>
+        )}
+        {status === "enabled" && (
+          <button onClick={disable} disabled={busy} className="text-stone-500 hover:text-red-600 font-medium px-4 py-2.5 text-sm transition">Disable</button>
+        )}
+      </div>
+    </div>
   );
 }

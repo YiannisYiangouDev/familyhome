@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { isAdmin } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/email";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { notifyAdmins } from "@/lib/push";
 
 const stripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-08-26.dahlia" });
 const PENDING_HOLD_MINUTES = 30;
@@ -109,6 +110,12 @@ export async function POST(req: NextRequest) {
       totalCents: booking.totalCents,
       depositCents: booking.depositCents,
     }).catch(() => {});
+
+    void notifyAdmins(
+      "New booking request 🏠",
+      `${guestName} · ${checkIn} → ${checkOut} · €${(booking.totalCents / 100).toFixed(2)}`,
+      `${baseUrl}/admin`
+    ).catch(() => {});
 
     return NextResponse.json({ url: session.url });
   } catch {
