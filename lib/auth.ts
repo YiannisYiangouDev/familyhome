@@ -1,4 +1,3 @@
-
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
@@ -29,7 +28,13 @@ export async function login(password: string): Promise<boolean> {
   const got = Buffer.from(password);
   if (got.length !== expected.length || !timingSafeEqual(got, expected)) return false;
   const store = await cookies();
-  store.set(COOKIE, token(), { httpOnly: true, sameSite: "lax", maxAge: MAX_AGE, path: "/" });
+  store.set(COOKIE, token(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: MAX_AGE,
+    path: "/",
+  });
   return true;
 }
 
