@@ -25,10 +25,13 @@ CREATE TABLE IF NOT EXISTS "Booking" (
   "stripePaymentId" TEXT,
   notes TEXT NOT NULL DEFAULT '',
   "seasonId" INT REFERENCES "Season"(id),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expiresAt" TIMESTAMP(3)
 );
 
+ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3);
 CREATE INDEX IF NOT EXISTS "Booking_checkIn_checkOut_idx" ON "Booking"("checkIn", "checkOut");
+CREATE INDEX IF NOT EXISTS "Booking_status_expiresAt_idx" ON "Booking"(status, "expiresAt");
 
 CREATE TABLE IF NOT EXISTS "BlockedDate" (
   id SERIAL PRIMARY KEY,
