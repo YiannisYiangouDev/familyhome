@@ -1,9 +1,8 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { priceStay, parseDate } from "@/lib/pricing";
 import Stripe from "stripe";
-import { isAdmin, login, logout } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 import { sendBookingConfirmation } from "@/lib/email";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
@@ -12,17 +11,43 @@ const stripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Public POST: create booking -> Stripe Checkout
 export async function POST(req: NextRequest) {
-  // Rate limit per client IP (first statement so abuse is blocked before any work)
   if (!rateLimit(`booking:${clientIp(req)}`, 10, 60_000)) {
     return NextResponse.json({ error: "too many requests" }, { status: 429 });
   }
-  const body = await req.json();
-  const { checkIn, checkOut, guestName, email, phone, adults, children, notes } = body;
-  if (!checkIn || !checkOut || !guestName || !email) {
-    return NextResponse.json({ error: "missing fields" }, { status: 400 });
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
+
+  const checkIn = typeof body.checkIn === "string" ? body.checkIn : "";
+  const checkOut = typeof body.checkOut === "string" ? body.checkOut : "";
+  const guestName = typeof body.guestName === "string" ? body.guestName.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+  const adults = Number(body.adults);
+  const children = Number(body.children);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOut)) {
+    return NextResponse.json({ error: "dates must be YYYY-MM-DD" }, { status: 400 });
+  }
+  if (!guestName || guestName.length > 120) {
+    return NextResponse.json({ error: "invalid guest name" }, { status: 400 });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return NextResponse.json({ error: "invalid email" }, { status: 400 });
+  }
+
+  const adultCount = Number.isInteger(adults) ? adults : 2;
+  const childCount = Number.isInteger(children) ? children : 0;
+  if (adultCount < 1 || childCount < 0 || adultCount + childCount > 7) {
+    return NextResponse.json({ error: "Maximum occupancy is 7 guests" }, { status: 400 });
+  }
+
   const priced = await priceStay(checkIn, checkOut);
   if (!priced) return NextResponse.json({ error: "pricing unavailable" }, { status: 400 });
   if ("error" in priced) return NextResponse.json({ error: priced.error }, { status: 400 });
@@ -34,12 +59,12 @@ export async function POST(req: NextRequest) {
       nights: priced.nights,
       guestName,
       email,
-      phone: phone ?? "",
-      adults: Number(adults) || 2,
-      children: Number(children) || 0,
+      phone,
+      adults: adultCount,
+      children: childCount,
       totalCents: priced.totalCents,
       depositCents: priced.depositCents,
-      notes: notes ?? "",
+      notes,
       status: "pending",
     },
   });
@@ -48,47 +73,44 @@ export async function POST(req: NextRequest) {
   try {
     const session = await stripe().checkout.sessions.create({
       mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "eur",
-            product_data: { name: `FAMILY HOME ${checkIn} → ${checkOut}` },
-            unit_amount: booking.depositCents,
-          },
-          quantity: 1,
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          product_data: { name: `FAMILY HOME ${checkIn} → ${checkOut}` },
+          unit_amount: booking.depositCents,
         },
-      ],
+        quantity: 1,
+      }],
       customer_email: email,
       metadata: { bookingId: String(booking.id) },
       success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/book/cancel`,
     });
+
     await prisma.booking.update({
       where: { id: booking.id },
       data: { stripeSessionId: session.id },
     });
-    // Fire confirmation email asynchronously — never block the Stripe redirect.
-    const emailData = {
+
+    void sendBookingConfirmation({
       guestName,
       email,
-      checkIn: String(checkIn),
-      checkOut: String(checkOut),
+      checkIn,
+      checkOut,
       nights: priced.nights,
-      totalCents: booking.totalCents ?? 0,
-      depositCents: booking.depositCents ?? 0,
-    };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    sendBookingConfirmation(emailData).catch(() => {});
+      totalCents: booking.totalCents,
+      depositCents: booking.depositCents,
+    }).catch(() => {});
 
     return NextResponse.json({ url: session.url });
-  } catch (err: any) {
+  } catch (err) {
     await prisma.booking.delete({ where: { id: booking.id } });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Unable to start checkout";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-// Admin GET: list bookings
-export async function GET(req: NextRequest) {
+export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -99,13 +121,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ bookings });
 }
 
-// Admin DELETE: cancel by id
 export async function DELETE(req: NextRequest) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const id = Number(req.nextUrl.searchParams.get("id"));
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "valid id required" }, { status: 400 });
+  }
   await prisma.booking.update({ where: { id }, data: { status: "cancelled" } });
   return NextResponse.json({ ok: true });
 }
