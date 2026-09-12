@@ -69,7 +69,13 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3030";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  if (!baseUrl) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    console.error("NEXT_PUBLIC_BASE_URL is not configured");
+    return NextResponse.json({ error: "Booking service is temporarily unavailable" }, { status: 503 });
+  }
+
   try {
     const session = await stripe().checkout.sessions.create({
       mode: "payment",
@@ -100,13 +106,13 @@ export async function POST(req: NextRequest) {
       nights: priced.nights,
       totalCents: booking.totalCents,
       depositCents: booking.depositCents,
-    }).catch(() => {});
+    }).catch((error) => console.error("Failed to send booking confirmation", error));
 
     return NextResponse.json({ url: session.url });
-  } catch (err) {
-    await prisma.booking.delete({ where: { id: booking.id } });
-    const message = err instanceof Error ? err.message : "Unable to start checkout";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    console.error("Stripe checkout creation failed", error);
+    return NextResponse.json({ error: "Unable to start checkout" }, { status: 500 });
   }
 }
 
