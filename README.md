@@ -1,4 +1,3 @@
-
 # Family Home — Protaras Direct-Booking Site
 
 Next.js + Postgres + Stripe. Self-hosted direct-booking website for
@@ -19,13 +18,13 @@ npm run dev     # http://localhost:3031
 2. `docker compose up -d --build web`
 3. Open `/admin` and configure seasonal rates + deposit % via the UI.
 4. Give Booking.com the iCal export URL:
-   `https://familyhome.yiangouweb.com/api/ical?token=<ICAL_TOKEN>`
-   so they sync blocked dates both ways.
+   `https://familyhomeprotaras.yiangouweb.com/api/ical?token=<ICAL_TOKEN>`
+   so they can sync blocked dates both ways.
 
 ## Stripe
 
 - Test mode keys go in `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`.
-- Register webhook: `https://familyhome.yiangouweb.com/api/stripe/webhook`
+- Register webhook: `https://familyhomeprotaras.yiangouweb.com/api/stripe/webhook`
   listening for `checkout.session.completed`.
 - Swap to live keys when ready — no code changes.
 
