@@ -1,4 +1,4 @@
-import ical from "node-ical";
+import ical, { type CalendarResponse, type VEvent } from "node-ical";
 import { prisma } from "./db";
 import { parseDate, fmtDate } from "./pricing";
 
@@ -8,11 +8,20 @@ const FETCH_TIMEOUT_MS = 25_000;
 export type ImportResult = { ok: boolean; imported: number; error?: string };
 
 /** Fetch the remote feed with a timeout so the scheduler can never hang. */
-async function fetchFeed(url: string): Promise<Record<string, ical.CalendarComponent>> {
+async function fetchFeed(url: string): Promise<CalendarResponse> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("iCal fetch timed out")), FETCH_TIMEOUT_MS)
   );
   return Promise.race([ical.async.fromURL(url), timeout]);
+}
+
+/** node-ical summaries can be plain strings or { value, params } objects. */
+function summaryText(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object" && "value" in v && typeof (v as { value: unknown }).value === "string") {
+    return (v as { value: string }).value;
+  }
+  return "";
 }
 
 /**
@@ -26,9 +35,9 @@ export async function importExternalCalendar(): Promise<ImportResult> {
   if (!raw) return { ok: false, imported: 0, error: "No iCal URL configured" };
   // Booking.com hands out webcal:// links; the fetcher needs http(s).
   const url = raw.replace(/^webcal:\/\//i, "https://");
-  if (!/^https:\/\//.test(url)) return { ok: false, imported: 0, error: "iCal URL must be https" };
+  if (!url.startsWith("https://")) return { ok: false, imported: 0, error: "iCal URL must be https" };
 
-  let events: Record<string, ical.CalendarComponent>;
+  let events: CalendarResponse;
   try {
     events = await fetchFeed(url);
   } catch (e) {
@@ -38,8 +47,10 @@ export async function importExternalCalendar(): Promise<ImportResult> {
   const seen: string[] = [];
   let imported = 0;
 
-  for (const [uid, ev] of Object.entries(events)) {
-    if (ev.type !== "VEVENT") continue;
+  for (const [uid, entry] of Object.entries(events)) {
+    if (!entry || typeof entry !== "object") continue;
+    if ((entry as { type?: string }).type !== "VEVENT") continue;
+    const ev = entry as VEvent;
     if (!ev.start || !ev.end) continue;
     if (uid.includes(SELF_DOMAIN)) continue; // our own feed echoed back
 
@@ -54,12 +65,12 @@ export async function importExternalCalendar(): Promise<ImportResult> {
         checkIn: parseDate(checkIn),
         checkOut: parseDate(checkOut),
         source: "booking",
-        summary: String(ev.summary ?? "").slice(0, 200),
+        summary: summaryText(ev.summary).slice(0, 200),
       },
       update: {
         checkIn: parseDate(checkIn),
         checkOut: parseDate(checkOut),
-        summary: String(ev.summary ?? "").slice(0, 200),
+        summary: summaryText(ev.summary).slice(0, 200),
       },
     });
     seen.push(uid);
