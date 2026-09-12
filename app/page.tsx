@@ -1,18 +1,31 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 
-/* ── scroll-reveal hook ── */
+/* ── scroll-reveal hook (with no-JS / observer-failure fallback) ── */
 function useReveal() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { el.classList.add("visible"); obs.disconnect(); } },
-      { threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
+    // Fallback: reveal immediately if IntersectionObserver is unavailable.
+    if (typeof IntersectionObserver === "undefined") {
+      el.classList.add("visible");
+      return;
+    }
+    let obs: IntersectionObserver | null = null;
+    try {
+      obs = new IntersectionObserver(
+        ([e]) => { if (e.isIntersecting) { el.classList.add("visible"); obs?.disconnect(); } },
+        { threshold: 0.15 }
+      );
+      obs.observe(el);
+    } catch {
+      el.classList.add("visible");
+    }
+    // Safety net: if the observer never fires (hydration deferred, scroll container,
+    // script error), force content visible after a short delay so the page is never blank.
+    const failSafe = setTimeout(() => el.classList.add("visible"), 1200);
+    return () => { obs?.disconnect(); clearTimeout(failSafe); };
   }, []);
   return ref;
 }
