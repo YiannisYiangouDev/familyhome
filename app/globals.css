@@ -72,6 +72,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .cal-day.today { border: 2px solid #f59e0b; font-weight: 700; }
 .cal-day .day-rate { font-size: 9px; line-height: 1; color: #a8a29e; font-weight: 600; margin-top: 1px; }
 .cal-day.selected .day-rate { color: rgba(0,0,0,0.7) !important; }
+.cal-day.ro { cursor: default; }
+.cal-day.ro:hover:not(.disabled):not(.selected) { background: transparent; transform: none; }
+.cal-day.ro .day-num { font-variant-numeric: tabular-nums; }
 
 /* Price badge */
 .price-badge { animation: pricePulse 3s ease-in-out infinite; }
