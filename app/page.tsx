@@ -290,6 +290,7 @@ export default function Home() {
             <Reveal>
               <div className="bg-white rounded-2xl overflow-hidden shadow-lg h-[420px]">
                 <iframe
+                  title="Map of Family Home Protaras location"
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31968.0!2d35.0421!3d34.9853!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14e13c7b3e3b4d3b%3A0x0!2sProtaras%2C%20Cyprus!5e0!3m2!1sen!2sus"
                   width="100%" height="100%" style={{ border: 0 }} allowFullScreen={true} loading="lazy" referrerPolicy="no-referrer-when-downgrade"
                 />
