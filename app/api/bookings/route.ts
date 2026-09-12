@@ -7,6 +7,7 @@ import { sendBookingConfirmation } from "@/lib/email";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const stripe = () => new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-08-26.dahlia" });
+const PENDING_HOLD_MINUTES = 30;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,13 +67,13 @@ export async function POST(req: NextRequest) {
       depositCents: priced.depositCents,
       notes,
       status: "pending",
+      expiresAt: new Date(Date.now() + PENDING_HOLD_MINUTES * 60_000),
     },
   });
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   if (!baseUrl) {
-    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
-    console.error("NEXT_PUBLIC_BASE_URL is not configured");
+    await prisma.booking.delete({ where: { id: booking.id } });
     return NextResponse.json({ error: "Booking service is temporarily unavailable" }, { status: 503 });
   }
 
@@ -91,6 +92,7 @@ export async function POST(req: NextRequest) {
       metadata: { bookingId: String(booking.id) },
       success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/book/cancel`,
+      expires_at: Math.floor(Date.now() / 1000) + PENDING_HOLD_MINUTES * 60,
     });
 
     await prisma.booking.update({
@@ -106,12 +108,11 @@ export async function POST(req: NextRequest) {
       nights: priced.nights,
       totalCents: booking.totalCents,
       depositCents: booking.depositCents,
-    }).catch((error) => console.error("Failed to send booking confirmation", error));
+    }).catch(() => {});
 
     return NextResponse.json({ url: session.url });
-  } catch (error) {
+  } catch {
     await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
-    console.error("Stripe checkout creation failed", error);
     return NextResponse.json({ error: "Unable to start checkout" }, { status: 500 });
   }
 }
