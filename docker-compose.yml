@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://familyhome:${POSTGRES_PASSWORD}@db:5432/familyhome
-      NEXT_PUBLIC_BASE_URL: https://familyhome.yiangouweb.com
+      NEXT_PUBLIC_BASE_URL: https://familyhomeprotaras.yiangouweb.com
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SITE_NAME: Family Home Protaras
       CONTACT_EMAIL: familyhome@yiangouweb.com
@@ -31,6 +31,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       RESEND_API_KEY: ${RESEND_API_KEY}
+      ICAL_TOKEN: ${ICAL_TOKEN}
     ports:
       - "3031:3031"
     depends_on:
