@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -31,14 +30,16 @@ model Booking {
   children        Int      @default(0)
   totalCents      Int
   depositCents    Int
-  status          String   @default("pending") // pending | confirmed | cancelled
+  status          String   @default("pending") // pending | confirmed | cancelled | expired
   stripeSessionId String?  @unique
   stripePaymentId String?
   notes           String   @default("")
   seasonId        Int?
   season          Season?  @relation(fields: [seasonId], references: [id])
   createdAt       DateTime @default(now())
+  expiresAt       DateTime?
   @@index([checkIn, checkOut])
+  @@index([status, expiresAt])
 }
 
 model BlockedDate {
