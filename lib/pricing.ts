@@ -1,4 +1,3 @@
-
 import { prisma } from "./db";
 
 export type NightRate = { date: string; rate: number };
@@ -21,6 +20,8 @@ export function nightsBetween(checkIn: string, checkOut: string): string[] {
   }
   return out;
 }
+
+const PENDING_HOLD_MINUTES = 30;
 
 export async function getSettings() {
   const rows = await prisma.setting.findMany();
@@ -49,7 +50,6 @@ export async function priceStay(checkIn: string, checkOut: string) {
   const ci = parseDate(checkIn);
   const co = parseDate(checkOut);
 
-  // blocked dates?
   const blocked = await prisma.blockedDate.findMany({
     where: { date: { gte: ci, lt: co } },
   });
@@ -57,19 +57,22 @@ export async function priceStay(checkIn: string, checkOut: string) {
     return { error: "Selected dates are not available" } as const;
   }
 
-  // overlapping confirmed/pending bookings?
+  const pendingCutoff = new Date(Date.now() - PENDING_HOLD_MINUTES * 60_000);
   const clash = await prisma.booking.findFirst({
     where: {
-      status: { in: ["pending", "confirmed"] },
       checkIn: { lt: co },
       checkOut: { gt: ci },
+      OR: [
+        { status: "confirmed" },
+        { status: "pending", expiresAt: { gt: new Date() } },
+        { status: "pending", expiresAt: null, createdAt: { gt: pendingCutoff } },
+      ],
     },
   });
   if (clash) {
     return { error: "Selected dates are already booked" } as const;
   }
 
-  // seasonal rates — every night must fall inside a season
   const seasons = await prisma.season.findMany({
     where: { startDate: { lte: ci }, endDate: { gte: co } },
     orderBy: { startDate: "asc" },
