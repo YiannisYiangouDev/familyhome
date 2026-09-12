@@ -58,7 +58,7 @@ async function loadCalendarData() {
   const horizonStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const horizonEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + MONTHS_AHEAD, 1));
 
-  const [seasons, blockedRows, bookings] = await Promise.all([
+  const [seasons, blockedRows, bookings, extBookings] = await Promise.all([
     prisma.season.findMany({ orderBy: { startDate: "asc" } }),
     prisma.blockedDate.findMany({ orderBy: { date: "asc" } }),
     prisma.booking.findMany({
@@ -73,6 +73,10 @@ async function loadCalendarData() {
       },
       select: { checkIn: true, checkOut: true },
     }),
+    prisma.externalBooking.findMany({
+      where: { checkIn: { lt: horizonEnd }, checkOut: { gt: horizonStart } },
+      select: { checkIn: true, checkOut: true },
+    }),
   ]);
 
   const blocked = new Set<string>();
@@ -80,6 +84,9 @@ async function loadCalendarData() {
 
   const booked = new Set<string>();
   for (const bk of bookings) {
+    for (const d of nightsBetween(bk.checkIn, bk.checkOut)) booked.add(d);
+  }
+  for (const bk of extBookings) {
     for (const d of nightsBetween(bk.checkIn, bk.checkOut)) booked.add(d);
   }
 

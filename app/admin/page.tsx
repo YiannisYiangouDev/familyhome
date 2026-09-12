@@ -242,12 +242,33 @@ function Blocked() {
 function Settings() {
   const [settings, setSettings] = useState<any>({});
   const [saved, setSaved] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
   useEffect(() => { fetch("/api/settings").then(r => r.json()).then(d => setSettings(d.settings || d)); }, []);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+  async function importNow() {
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const r = await fetch("/api/ical/import", { method: "POST" });
+      const d = await r.json();
+      if (d.ok) {
+        setImportMsg(`✓ Imported ${d.imported} event${d.imported === 1 ? "" : "s"}`);
+        const ref = await fetch("/api/settings"); const rd = await ref.json();
+        setSettings(rd.settings || rd);
+      } else {
+        setImportMsg(`✗ ${d.error || "Import failed"}`);
+      }
+    } catch {
+      setImportMsg("✗ Import failed");
+    } finally {
+      setImporting(false);
+    }
   }
   return (
     <div className="space-y-6 max-w-lg">
@@ -273,6 +294,25 @@ function Settings() {
           <label className="block text-sm font-semibold mb-1 text-stone-700">Cleaning fee (€)</label>
           <input type="number" value={settings.cleaningFee ?? 0} onChange={e => setSettings({ ...settings, cleaningFee: Number(e.target.value) })}
             className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1 text-stone-700">Booking.com iCal URL (import)</label>
+          <input type="url" placeholder="https://…/calendar.ics or webcal://…" value={settings.ical_import_url ?? ""}
+            onChange={e => setSettings({ ...settings, ical_import_url: e.target.value })}
+            className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
+          <p className="text-xs text-stone-400 mt-1">
+            Auto-imports every 6 hours and blocks those dates on your site. Find it in the Booking.com Extranet → Calendar → Export calendar.
+          </p>
+          <div className="flex items-center gap-3 mt-2">
+            <button type="button" onClick={importNow} disabled={importing}
+              className="bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+              {importing ? "Importing…" : "Import now"}
+            </button>
+            {importMsg && <span className="text-xs text-stone-600">{importMsg}</span>}
+          </div>
+          {settings.ical_last_sync && (
+            <p className="text-xs text-stone-400 mt-1.5">Last sync: {new Date(settings.ical_last_sync).toLocaleString()}</p>
+          )}
         </div>
       </div>
       <button type="submit" className="mt-6 bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-3 rounded-lg transition">

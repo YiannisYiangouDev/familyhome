@@ -60,3 +60,13 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
 }
+
+model ExternalBooking {
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique
+  checkIn   DateTime @db.Date
+  checkOut  DateTime @db.Date
+  source    String   @default("external")
+  summary   String   @default("")
+  updatedAt DateTime @default(now())
+}

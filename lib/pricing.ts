@@ -73,6 +73,13 @@ export async function priceStay(checkIn: string, checkOut: string) {
     return { error: "Selected dates are already booked" } as const;
   }
 
+  const extClash = await prisma.externalBooking.findFirst({
+    where: { checkIn: { lt: co }, checkOut: { gt: ci } },
+  });
+  if (extClash) {
+    return { error: "Selected dates are already booked" } as const;
+  }
+
   const seasons = await prisma.season.findMany({
     where: { startDate: { lte: ci }, endDate: { gte: co } },
     orderBy: { startDate: "asc" },
