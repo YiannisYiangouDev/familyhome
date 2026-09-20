@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Tab = "login" | "bookings" | "seasons" | "blocked" | "settings";
+type Tab = "dashboard" | "bookings" | "seasons" | "blocked" | "settings";
 
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>("bookings");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -52,6 +52,7 @@ export default function Admin() {
   }
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: "dashboard", label: "Dashboard", icon: "📊" },
     { key: "bookings", label: "Bookings", icon: "📋" },
     { key: "seasons", label: "Seasons", icon: "📅" },
     { key: "blocked", label: "Blocked", icon: "🚫" },
@@ -83,12 +84,38 @@ export default function Admin() {
             </button>
           ))}
         </nav>
+        {tab === "dashboard" && <Dashboard />}
         {tab === "bookings" && <Bookings />}
         {tab === "seasons" && <Seasons />}
         {tab === "blocked" && <Blocked />}
         {tab === "settings" && <Settings />}
       </div>
     </main>
+  );
+}
+
+function Dashboard() {
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(() => { fetch("/api/bookings").then(r => r.json()).then(d => setRows(d.bookings || [])); }, []);
+  const confirmed = rows.filter(r => r.status === "confirmed");
+  const revenue = confirmed.reduce((s, r) => s + (r.totalCents || 0), 0) / 100;
+  const upcoming = confirmed.filter(r => new Date(r.checkIn) >= new Date()).length;
+  const pending = rows.filter(r => r.status === "pending").length;
+  const cards = [
+    { label: "Confirmed bookings", value: String(confirmed.length) },
+    { label: "Upcoming stays", value: String(upcoming) },
+    { label: "Pending", value: String(pending) },
+    { label: "Confirmed revenue", value: `€${revenue.toLocaleString("en-GB", { maximumFractionDigits: 2 })}` },
+  ];
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {cards.map(c => (
+        <div key={c.label} className="bg-white rounded-2xl border border-stone-200 p-6">
+          <p className="text-sm text-stone-500">{c.label}</p>
+          <p className="text-2xl font-bold text-stone-800 mt-1">{c.value}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -114,7 +141,7 @@ function Bookings() {
           <table className="w-full text-sm">
             <thead className="bg-stone-50 border-b border-stone-100">
               <tr>
-                {["Date", "Guest", "Nights", "Total", "Status", ""].map(h => (
+                {["Date", "Guest", "Nights", "Deposit", "Total", "Status", ""].map(h => (
                   <th key={h} className="text-left p-3 font-semibold text-stone-600">{h}</th>
                 ))}
               </tr>
@@ -122,9 +149,10 @@ function Bookings() {
             <tbody className="divide-y divide-stone-100">
               {rows.map(r => (
                 <tr key={r.id} className="hover:bg-stone-50/50 transition">
-                  <td className="p-3 text-stone-700">{r.checkIn}</td>
+                  <td className="p-3 text-stone-700">{new Date(r.checkIn).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
                   <td className="p-3"><p className="font-medium text-stone-800">{r.guestName}</p><p className="text-xs text-stone-500">{r.email}</p></td>
                   <td className="p-3 text-stone-700">{r.nights || "—"}</td>
+                  <td className="p-3 text-stone-700">€{r.depositCents ? (r.depositCents / 100).toFixed(2) : "—"}</td>
                   <td className="p-3 font-medium text-stone-800">€{r.totalCents ? (r.totalCents / 100).toFixed(2) : "—"}</td>
                   <td className="p-3"><span className={`badge ${statusColor[r.status] || "bg-stone-100 text-stone-600"}`}>{r.status}</span></td>
                   <td className="p-3">{r.status !== "cancelled" && <button onClick={() => cancel(r.id)} className="text-red-600 hover:text-red-700 text-xs font-medium">Cancel</button>}</td>
@@ -276,23 +304,28 @@ function Settings() {
       <h2 className="font-bold text-stone-800 mb-6">Site Settings</h2>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold mb-1 text-stone-700">Base rate (€/night)</label>
-          <input type="number" value={settings.baseRate ?? 200} onChange={e => setSettings({ ...settings, baseRate: Number(e.target.value) })}
-            className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
-        </div>
-        <div>
           <label className="block text-sm font-semibold mb-1 text-stone-700">Minimum stay (nights)</label>
-          <input type="number" value={settings.minStay ?? 3} onChange={e => setSettings({ ...settings, minStay: Number(e.target.value) })}
+          <input type="number" value={settings.min_nights ?? 3} onChange={e => setSettings({ ...settings, min_nights: Number(e.target.value) })}
             className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1 text-stone-700">Deposit %</label>
-          <input type="number" value={settings.depositPct ?? 30} onChange={e => setSettings({ ...settings, depositPct: Number(e.target.value) })}
+          <input type="number" value={settings.deposit_pct ?? 30} onChange={e => setSettings({ ...settings, deposit_pct: Number(e.target.value) })}
             className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1 text-stone-700">Cleaning fee (€)</label>
-          <input type="number" value={settings.cleaningFee ?? 0} onChange={e => setSettings({ ...settings, cleaningFee: Number(e.target.value) })}
+          <input type="number" value={settings.cleaning_fee ?? 0} onChange={e => setSettings({ ...settings, cleaning_fee: Number(e.target.value) })}
+            className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1 text-stone-700">Contact email</label>
+          <input type="email" value={settings.contact_email ?? ""} onChange={e => setSettings({ ...settings, contact_email: e.target.value })}
+            className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1 text-stone-700">Contact phone</label>
+          <input type="text" value={settings.contact_phone ?? ""} onChange={e => setSettings({ ...settings, contact_phone: e.target.value })}
             className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm" />
         </div>
         <div>

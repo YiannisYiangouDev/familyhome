@@ -218,20 +218,37 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-stone-800">Our Villa</h2>
             <p className="text-stone-600 mt-2">36 photos — click any image for full-size view</p>
           </Reveal>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {Array.from({ length: 36 }, (_, i) => (
-              <button
-                key={i}
-                onClick={() => setLightbox(i)}
-                className="aspect-square overflow-hidden rounded-xl cursor-pointer img-zoom shadow-sm hover:shadow-xl transition-shadow duration-300"
-              >
-                <img
-                  src={`/photos/photo-${String(i + 1).padStart(2, "0")}.jpg`}
-                  alt={`Photo ${i + 1}`}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </button>
+          <div className="space-y-10">
+            {[
+              { label: "Exterior & Garden", range: [0, 7] },
+              { label: "Living Areas", range: [7, 13] },
+              { label: "Kitchen & Dining", range: [13, 19] },
+              { label: "Bedrooms", range: [19, 27] },
+              { label: "Bathrooms", range: [27, 31] },
+              { label: "Amenities & Details", range: [31, 36] },
+            ].map(group => (
+              <div key={group.label}>
+                <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">{group.label}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: group.range[1] - group.range[0] }, (_, j) => {
+                    const i = group.range[0] + j;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setLightbox(i)}
+                        className="aspect-square overflow-hidden rounded-xl cursor-pointer img-zoom shadow-sm hover:shadow-xl transition-shadow duration-300"
+                      >
+                        <img
+                          src={`/photos/photo-${String(i + 1).padStart(2, "0")}.jpg`}
+                          alt={`${group.label} photo ${j + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -402,6 +419,17 @@ export default function Home() {
           </Reveal>
         </div>
       </section>
+
+      {/* ── Sticky booking bar ── */}
+      <div className="sticky bottom-0 z-40 bg-stone-900/95 backdrop-blur border-t border-stone-700">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+          <div className="text-white">
+            <p className="text-sm font-semibold">From €200/night · 3-night min · 30% deposit</p>
+            <p className="text-xs text-white/60">Rated 9.9 — book direct and save</p>
+          </div>
+          <a href="/book" className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-2.5 rounded-full text-sm transition whitespace-nowrap">Book Now</a>
+        </div>
+      </div>
 
       {/* ── Trust badges ── */}
       <section className="py-10 bg-white">
