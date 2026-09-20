@@ -11,7 +11,12 @@ export async function GET() {
   const rows = await prisma.setting.findMany();
   const settings: Record<string, string> = {};
   for (const r of rows) settings[r.key] = r.value;
-  return NextResponse.json({ settings });
+  const icalToken = process.env.ICAL_TOKEN || "";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://familyhomeprotaras.yiangouweb.com";
+  return NextResponse.json({
+    settings,
+    icalExportUrl: icalToken ? `${baseUrl}/api/ical?token=${icalToken}` : "",
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -121,6 +121,7 @@ function Dashboard() {
 
 function Bookings() {
   const [rows, setRows] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<number | null>(null);
   useEffect(() => { fetch("/api/bookings").then(r => r.json()).then(d => setRows(d.bookings || [])); }, []);
   async function cancel(id: number) {
     if (!confirm("Cancel this booking?")) return;
@@ -148,15 +149,46 @@ function Bookings() {
             </thead>
             <tbody className="divide-y divide-stone-100">
               {rows.map(r => (
-                <tr key={r.id} className="hover:bg-stone-50/50 transition">
-                  <td className="p-3 text-stone-700">{new Date(r.checkIn).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                  <td className="p-3"><p className="font-medium text-stone-800">{r.guestName}</p><p className="text-xs text-stone-500">{r.email}</p></td>
-                  <td className="p-3 text-stone-700">{r.nights || "—"}</td>
-                  <td className="p-3 text-stone-700">€{r.depositCents ? (r.depositCents / 100).toFixed(2) : "—"}</td>
-                  <td className="p-3 font-medium text-stone-800">€{r.totalCents ? (r.totalCents / 100).toFixed(2) : "—"}</td>
-                  <td className="p-3"><span className={`badge ${statusColor[r.status] || "bg-stone-100 text-stone-600"}`}>{r.status}</span></td>
-                  <td className="p-3">{r.status !== "cancelled" && <button onClick={() => cancel(r.id)} className="text-red-600 hover:text-red-700 text-xs font-medium">Cancel</button>}</td>
-                </tr>
+                <>
+                  <tr key={r.id} onClick={() => setExpanded(expanded === r.id ? null : r.id)} className="hover:bg-stone-50/50 transition cursor-pointer">
+                    <td className="p-3 text-stone-700">{new Date(r.checkIn).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                    <td className="p-3"><p className="font-medium text-stone-800">{r.guestName}</p><p className="text-xs text-stone-500">{r.email}</p></td>
+                    <td className="p-3 text-stone-700">{r.nights || "—"}</td>
+                    <td className="p-3 text-stone-700">€{r.depositCents ? (r.depositCents / 100).toFixed(2) : "—"}</td>
+                    <td className="p-3 font-medium text-stone-800">€{r.totalCents ? (r.totalCents / 100).toFixed(2) : "—"}</td>
+                    <td className="p-3"><span className={`badge ${statusColor[r.status] || "bg-stone-100 text-stone-600"}`}>{r.status}</span></td>
+                    <td className="p-3">{r.status !== "cancelled" && <button onClick={(e) => { e.stopPropagation(); cancel(r.id); }} className="text-red-600 hover:text-red-700 text-xs font-medium">Cancel</button>}</td>
+                  </tr>
+                  {expanded === r.id && (
+                    <tr key={r.id + "-detail"} className="bg-stone-50/60">
+                      <td colSpan={7} className="p-5">
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Guest</p>
+                            <p className="font-medium text-stone-800">{r.guestName}</p>
+                            <p className="text-stone-600">{r.email}</p>
+                            <p className="text-stone-600">{r.phone || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Stay</p>
+                            <p className="text-stone-800">{new Date(r.checkIn).toLocaleDateString("en-GB")} → {new Date(r.checkOut).toLocaleDateString("en-GB")}</p>
+                            <p className="text-stone-600">{r.nights} nights · {r.adults ?? 2} adults{r.children ? ` · ${r.children} children` : ""}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Payment</p>
+                            <p className="text-stone-800">Deposit: €{r.depositCents ? (r.depositCents / 100).toFixed(2) : "—"}</p>
+                            <p className="text-stone-800">Total: €{r.totalCents ? (r.totalCents / 100).toFixed(2) : "—"}</p>
+                            {r.stripeSessionId && <p className="text-xs text-stone-400 mt-1">Stripe session: {String(r.stripeSessionId).slice(0, 24)}…</p>}
+                          </div>
+                          <div>
+                            <p className="text-xs text-stone-500 uppercase tracking-wider mb-1">Notes</p>
+                            <p className="text-stone-700">{r.notes || "—"}</p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
@@ -269,10 +301,16 @@ function Blocked() {
 
 function Settings() {
   const [settings, setSettings] = useState<any>({});
+  const [icalExportUrl, setIcalExportUrl] = useState("");
   const [saved, setSaved] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
-  useEffect(() => { fetch("/api/settings").then(r => r.json()).then(d => setSettings(d.settings || d)); }, []);
+  useEffect(() => {
+    fetch("/api/settings").then(r => r.json()).then(d => {
+      setSettings(d.settings || d);
+      setIcalExportUrl(d.icalExportUrl || "");
+    });
+  }, []);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
@@ -346,6 +384,16 @@ function Settings() {
           {settings.ical_last_sync && (
             <p className="text-xs text-stone-400 mt-1.5">Last sync: {new Date(settings.ical_last_sync).toLocaleString()}</p>
           )}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-1 text-stone-700">Your iCal export link (paste into Booking.com)</label>
+          <div className="flex gap-2">
+            <input readOnly value={icalExportUrl}
+              className="w-full border border-stone-300 rounded-lg px-4 py-2 text-sm bg-stone-50 text-stone-500" />
+            <button type="button" onClick={() => { if (icalExportUrl) { navigator.clipboard.writeText(icalExportUrl); } }}
+              className="shrink-0 bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Copy</button>
+          </div>
+          <p className="text-xs text-stone-400 mt-1">This exports your direct bookings so Booking.com blocks those dates. Paste it in Booking.com → Calendar → Import calendar.</p>
         </div>
       </div>
       <button type="submit" className="mt-6 bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-3 rounded-lg transition">
