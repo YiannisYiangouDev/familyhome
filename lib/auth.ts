@@ -31,7 +31,7 @@ export async function login(password: string): Promise<boolean> {
   store.set(COOKIE, token(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     maxAge: MAX_AGE,
     path: "/",
   });
