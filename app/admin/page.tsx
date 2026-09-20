@@ -107,14 +107,53 @@ function Dashboard() {
     { label: "Pending", value: String(pending) },
     { label: "Confirmed revenue", value: `€${revenue.toLocaleString("en-GB", { maximumFractionDigits: 2 })}` },
   ];
+
+  // Revenue by month (confirmed bookings, by check-in month)
+  const monthly: Record<string, number> = {};
+  for (const b of confirmed) {
+    const d = new Date(b.checkIn);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthly[key] = (monthly[key] || 0) + (b.totalCents || 0) / 100;
+  }
+  const months = Object.keys(monthly).sort();
+  const maxVal = Math.max(1, ...Object.values(monthly));
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map(c => (
-        <div key={c.label} className="bg-white rounded-2xl border border-stone-200 p-6">
-          <p className="text-sm text-stone-500">{c.label}</p>
-          <p className="text-2xl font-bold text-stone-800 mt-1">{c.value}</p>
-        </div>
-      ))}
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map(c => (
+          <div key={c.label} className="bg-white rounded-2xl border border-stone-200 p-6">
+            <p className="text-sm text-stone-500">{c.label}</p>
+            <p className="text-2xl font-bold text-stone-800 mt-1">{c.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-6">
+        <h2 className="font-bold text-stone-800 mb-1">Revenue by Month</h2>
+        <p className="text-sm text-stone-500 mb-6">Confirmed bookings, by check-in month</p>
+        {months.length === 0 ? (
+          <div className="p-10 text-center text-stone-400">No confirmed bookings yet</div>
+        ) : (
+          <div className="space-y-3">
+            {months.map(m => {
+              const [y, mm] = m.split("-");
+              const label = `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][Number(mm) - 1]} ${y}`;
+              const v = monthly[m];
+              return (
+                <div key={m} className="flex items-center gap-3">
+                  <span className="text-sm text-stone-600 w-20">{label}</span>
+                  <div className="flex-1 h-6 bg-stone-100 rounded-lg overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-lg" style={{ width: `${(v / maxVal) * 100}%` }} />
+                  </div>
+                  <span className="text-sm font-semibold text-stone-800 w-20 text-right">€{v.toLocaleString("en-GB", { maximumFractionDigits: 0 })}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -128,12 +167,34 @@ function Bookings() {
     await fetch(`/api/bookings?id=${id}`, { method: "DELETE" });
     setRows(rows.map(r => r.id === id ? { ...r, status: "cancelled" } : r));
   }
+  function exportCsv() {
+    const head = ["ID", "Check-in", "Check-out", "Guest", "Email", "Phone", "Nights", "Adults", "Children", "Deposit", "Total", "Status", "Notes"];
+    const esc = (v: any) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = rows.map(r => [
+      r.id, r.checkIn, r.checkOut, r.guestName, r.email, r.phone, r.nights, r.adults, r.children,
+      r.depositCents ? (r.depositCents / 100).toFixed(2) : "",
+      r.totalCents ? (r.totalCents / 100).toFixed(2) : "",
+      r.status, r.notes,
+    ].map(esc).join(","));
+    const csv = [head.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
   const statusColor: Record<string, string> = { confirmed: "bg-green-100 text-green-700", pending: "bg-amber-100 text-amber-700", cancelled: "bg-red-100 text-red-700" };
   return (
     <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-stone-100 flex justify-between items-center">
         <h2 className="font-bold text-stone-800">Bookings</h2>
-        <span className="text-sm text-stone-500">{rows.length} total</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-stone-500">{rows.length} total</span>
+          {rows.length > 0 && (
+            <button onClick={exportCsv} className="bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Export CSV</button>
+          )}
+        </div>
       </div>
       {rows.length === 0 ? (
         <div className="p-12 text-center text-stone-400">No bookings yet</div>
