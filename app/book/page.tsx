@@ -25,6 +25,10 @@ const DOW = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
+function qs(key: string): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(key) ?? "";
+}
 function addDays(s: string, n: number) {
   const d = new Date(s + "T12:00:00");
   d.setDate(d.getDate() + n);
@@ -38,8 +42,8 @@ function fmtDate(s: string) {
 }
 
 export default function BookPage() {
-  const [ci, setCi] = useState("");
-  const [co, setCo] = useState("");
+  const [ci, setCi] = useState(() => qs("ci"));
+  const [co, setCo] = useState(() => qs("co"));
   const [calMonth, setCalMonth] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -47,7 +51,12 @@ export default function BookPage() {
   const [price, setPrice] = useState<Price | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ guestName: "", email: "", phone: "", adults: 2, children: 0, notes: "" });
+  const [form, setForm] = useState(() => ({
+    guestName: "", email: "", phone: "",
+    adults: Number(qs("adults")) || 2,
+    children: Number(qs("children")) || 0,
+    notes: "",
+  }));
   const [submitting, setSubmitting] = useState(false);
   const [rates, setRates] = useState<Rates | null>(null);
 

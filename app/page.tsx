@@ -89,15 +89,43 @@ function AccordionItem({ question, answer }: { question: string; answer: string 
 export default function Home() {
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [wCi, setWCi] = useState("");
+  const [wCo, setWCo] = useState("");
+  const [wAdults, setWAdults] = useState(2);
+  const [wChildren, setWChildren] = useState(0);
+
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function search() {
+    const p = new URLSearchParams();
+    if (wCi) p.set("ci", wCi);
+    if (wCo) p.set("co", wCo);
+    p.set("adults", String(wAdults));
+    p.set("children", String(wChildren));
+    window.location.href = "/book?" + p.toString();
+  }
 
   return (
     <main>
       {/* ── Hero ── */}
       <section className="relative h-svh min-h-[560px] overflow-hidden">
-        <div className="absolute inset-0">
-          <img src="/photos/photo-01.jpg" alt="" className="w-full h-full object-cover kenburns" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60" />
+        <div className="absolute inset-0 grid grid-cols-4 grid-rows-2 gap-1">
+          <button onClick={() => setLightbox(0)} className="col-span-2 row-span-2 overflow-hidden group">
+            <img src="/photos/photo-01.jpg" alt="Family Home exterior" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          </button>
+          <button onClick={() => setLightbox(1)} className="overflow-hidden group"><img src="/photos/photo-02.jpg" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /></button>
+          <button onClick={() => setLightbox(2)} className="overflow-hidden group"><img src="/photos/photo-03.jpg" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /></button>
+          <button onClick={() => setLightbox(3)} className="overflow-hidden group relative">
+            <img src="/photos/photo-04.jpg" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          </button>
+          <button onClick={() => setLightbox(4)} className="overflow-hidden group relative">
+            <img src="/photos/photo-05.jpg" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <span className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-semibold text-sm">Show all 36 photos →</span>
+          </button>
         </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60 pointer-events-none" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-white text-center px-6 hero-stagger">
           <span className="badge bg-amber-500/20 text-amber-300 border border-amber-400/30 mb-6">Protaras, Cyprus</span>
           <h1 className="text-5xl sm:text-7xl md:text-8xl font-extrabold mb-4 tracking-tight">Family Home</h1>
@@ -112,6 +140,30 @@ export default function Home() {
               View Gallery
             </a>
           </div>
+
+          {/* Booking search widget */}
+          <div className="mt-10 w-full max-w-3xl bg-white/95 backdrop-blur rounded-2xl p-3 shadow-2xl grid grid-cols-2 md:grid-cols-4 gap-2 text-left">
+            <div className="p-3 rounded-xl border border-stone-200">
+              <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Check-in</label>
+              <input type="date" value={wCi} min={todayStr()} onChange={e => setWCi(e.target.value)}
+                className="w-full text-sm font-semibold text-stone-800 mt-1 bg-transparent outline-none" />
+            </div>
+            <div className="p-3 rounded-xl border border-stone-200">
+              <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Check-out</label>
+              <input type="date" value={wCo} min={wCi || todayStr()} onChange={e => setWCo(e.target.value)}
+                className="w-full text-sm font-semibold text-stone-800 mt-1 bg-transparent outline-none" />
+            </div>
+            <div className="p-3 rounded-xl border border-stone-200">
+              <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Guests</label>
+              <div className="flex items-center gap-2 mt-1">
+                <button type="button" onClick={() => setWAdults(a => Math.max(1, a - 1))} className="w-7 h-7 rounded-full border border-stone-300 font-bold text-stone-600 hover:bg-stone-100">−</button>
+                <span className="text-sm font-semibold text-stone-800">{wAdults + wChildren}</span>
+                <button type="button" onClick={() => setWAdults(a => Math.min(7, a + 1))} className="w-7 h-7 rounded-full border border-stone-300 font-bold text-stone-600 hover:bg-stone-100">+</button>
+              </div>
+            </div>
+            <button onClick={search} className="m-1 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition">Search</button>
+          </div>
+
           <div className="mt-14 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-white/70">
             <span>⭐ <strong className="text-white">9.9</strong> Rating</span>
             <span>🛏 <strong className="text-white">4</strong> Bedrooms</span>
@@ -271,6 +323,29 @@ export default function Home() {
             <span className="badge bg-amber-100 text-amber-700 mb-4">Testimonials</span>
             <h2 className="text-3xl font-bold text-stone-800">What Guests Say</h2>
           </Reveal>
+
+          <div className="max-w-2xl mx-auto mb-12 grid grid-cols-[auto_1fr] gap-x-10 gap-y-5 items-center bg-stone-50 rounded-2xl p-8 border border-stone-100">
+            <div className="text-center">
+              <p className="text-5xl font-extrabold text-stone-800">9.9</p>
+              <p className="text-amber-400 tracking-wide mt-1">★★★★★</p>
+              <p className="text-xs text-stone-500 mt-1">29 reviews · Booking.com</p>
+            </div>
+            <div className="space-y-2.5">
+              {[
+                { label: "Cleanliness", v: 10 }, { label: "Location", v: 10 },
+                { label: "Value for money", v: 9.8 }, { label: "Comfort", v: 9.9 },
+              ].map(r => (
+                <div key={r.label} className="flex items-center gap-3">
+                  <span className="text-sm text-stone-600 w-32">{r.label}</span>
+                  <div className="flex-1 h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(r.v / 10) * 100}%` }} />
+                  </div>
+                  <span className="text-sm font-semibold text-stone-700 w-8 text-right">{r.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { name: "Mac", country: "🇬🇧 UK", text: "Amazing place, truly 10/10. Great location with couple minutes walk to the beach, 5-10 minutes to major view points, attractions and shops." },
